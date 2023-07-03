@@ -16,6 +16,7 @@ export const createRemixLambda = (config: {
     runtime: 'nodejs18.x',
     handler: config.handler,
     code: config.code,
+    timeout: 120,
   })
 
   return lambda
