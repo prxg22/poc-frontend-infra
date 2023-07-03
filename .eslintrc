@@ -1,0 +1,5 @@
+{
+  "extends": [
+    "@lemonenergy/eslint-config-frontend-ssr"
+  ]
+}
