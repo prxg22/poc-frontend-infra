@@ -9,6 +9,7 @@ import {
   Headers as NodeHeaders,
   Request as NodeRequest,
   createRequestHandler as createRemixRequestHandler,
+  readableStreamToString,
   writeReadableStreamToWritable,
 } from '@remix-run/node'
 import type {
@@ -16,6 +17,7 @@ import type {
   Callback,
   Context,
   APIGatewayProxyEventV2,
+  APIGatewayProxyStructuredResultV2,
 } from 'aws-lambda'
 import { streamifyResponse, type ResponseStream } from 'lambda-stream'
 
@@ -51,17 +53,45 @@ export function createRequestHandler({
   build: ServerBuild
   getLoadContext?: GetLoadContextFunction
   mode?: string
+}): RequestHandler {
+  let handleRequest = createRemixRequestHandler(build, mode)
+
+  return async (event) => {
+    let request = createRemixRequest(event)
+    let loadContext = await getLoadContext?.(event)
+
+    let response = (await handleRequest(request, loadContext)) as NodeResponse
+
+    return sendRemixResponse(response)
+  }
+}
+
+export function createStreamRequestHandler({
+  build,
+  getLoadContext,
+  mode = process.env.NODE_ENV,
+}: {
+  build: ServerBuild
+  getLoadContext?: GetLoadContextFunction
+  mode?: string
 }) {
   let handleRequest = createRemixRequestHandler(build, mode)
 
   return streamifyResponse(
     async (event: APIGatewayProxyEventV2, streamResponse: ResponseStream) => {
+      console.log(streamResponse)
       let request = createRemixRequest(event)
       let loadContext = await getLoadContext?.(event)
 
       let response = (await handleRequest(request, loadContext)) as NodeResponse
 
-      return sendRemixResponse(response, streamResponse)
+      sendStreamRemixResponse(response, streamResponse)
+
+      return {
+        statusCode: response.status,
+        headers: Object.fromEntries(response.headers),
+        body: response.body,
+      }
     },
   ) as RequestHandler
 }
@@ -112,10 +142,31 @@ export function createRemixHeaders(
   return headers
 }
 
-export async function sendRemixResponse(
+export async function sendStreamRemixResponse(
   nodeResponse: NodeResponse,
   streamResponse: ResponseStream,
 ) {
+  let contentType = nodeResponse.headers.get('Content-Type')
+  streamResponse.setContentType(contentType || 'text/html')
+
+  const metadata = {
+    status: nodeResponse.status,
+    headers: nodeResponse.headers,
+    isBinaryType: isBinaryType(contentType),
+  }
+
+  // @ts-expect-error
+  const response = awslambda.HttpResponseStream.from(streamResponse, metadata)
+  console.log({ metadata, response })
+
+  if (nodeResponse.body) {
+    return writeReadableStreamToWritable(nodeResponse.body, response)
+  }
+}
+
+export async function sendRemixResponse(
+  nodeResponse: NodeResponse,
+): Promise<APIGatewayProxyStructuredResultV2> {
   let cookies: string[] = []
 
   // Arc/AWS API Gateway will send back set-cookies outside of response headers.
@@ -132,11 +183,22 @@ export async function sendRemixResponse(
   }
 
   let contentType = nodeResponse.headers.get('Content-Type')
-  // let isBase64Encoded = isBinaryType(contentType)
-  console.log({ streamResponse })
-  streamResponse.setContentType(contentType || 'text/html')
-  // streamResponse.setIsBase64Encoded(isBase64Encoded)
+  let isBase64Encoded = isBinaryType(contentType)
+  let body: string | undefined
+
   if (nodeResponse.body) {
-    return writeReadableStreamToWritable(nodeResponse.body, streamResponse)
+    if (isBase64Encoded) {
+      body = await readableStreamToString(nodeResponse.body, 'base64')
+    } else {
+      body = await nodeResponse.text()
+    }
+  }
+
+  return {
+    statusCode: nodeResponse.status,
+    headers: Object.fromEntries(nodeResponse.headers.entries()),
+    cookies,
+    body,
+    isBase64Encoded,
   }
 }

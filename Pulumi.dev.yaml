@@ -1,12 +1,10 @@
-encryptionsalt: v1:xHalkXd8bNg=:v1:Y8Oy1ceg0gaiyiXe:uTy3zqI4isWlraMA17gl1bjnIoUoIg==
+encryptionsalt: v1:sDQUjzSf+nU=:v1:QeWw7dAL4395HDdH:+O1S4Av301FGpzzpA/QBYJif6mKgCg==
 config:
-  aws-native:region: us-east-2
-  aws:region: us-east-2
   aws:accessKey: test
   aws:secretKey: test
-  aws:s3UsePathStyle: true
-  aws:skipCredentialsValidation: true
-  aws:skipRequestingAccountId: true
+  aws:s3UsePathStyle: 'true'
+  aws:skipCredentialsValidation: 'true'
+  aws:skipRequestingAccountId: 'true'
   aws:endpoints:
     - accessanalyzer: http://localhost:4566
       account: http://localhost:4566

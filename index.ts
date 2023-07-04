@@ -74,12 +74,9 @@ const remixFunctionUrl = createRemixFunctionUrl({
   lambda: remixLambda,
 })
 
-const oai = createPublicBucketOriginAccessIdentity({
-  service,
-  stage,
-})
+let cdn: aws.cloudfront.Distribution | undefined
 
-const remixCachePolicy = createRemixCachePolicy({
+const oai = createPublicBucketOriginAccessIdentity({
   service,
   stage,
 })
@@ -94,18 +91,25 @@ createPublicBucketPolicy({
   }),
 })
 
-const cdn = createRemixDistribution({
-  service,
-  stage,
-  publicBucket: publicBucket.bucket,
-  publicSource,
-  lambdaUrl: remixFunctionUrl,
-  remixCachePolicy,
-  publicOriginAccessIdentity: oai,
-  host: '',
-})
+if (stage !== 'dev') {
+  const remixCachePolicy = createRemixCachePolicy({
+    service,
+    stage,
+  })
+
+  cdn = createRemixDistribution({
+    service,
+    stage,
+    publicBucket: publicBucket.bucket,
+    publicSource,
+    lambdaUrl: remixFunctionUrl,
+    remixCachePolicy,
+    publicOriginAccessIdentity: oai,
+    host: '',
+  })
+}
 
 export const functionUrl = remixFunctionUrl.functionUrl
-export const cdnUrl = cdn.domainName.apply(
+export const cdnUrl = cdn?.domainName.apply(
   (domainName) => `https://${domainName}`,
 )

@@ -59,7 +59,9 @@ export const createRemixDistribution = (config: {
       {
         domainName: config.publicBucket.bucketRegionalDomainName,
         originId: config.publicBucket.arn,
-        originPath: config.publicSource.startsWith('/') ? config.publicSource : `/${config.publicSource}`,
+        originPath: config.publicSource.startsWith('/')
+          ? config.publicSource
+          : `/${config.publicSource}`,
         s3OriginConfig: {
           originAccessIdentity: config.publicOriginAccessIdentity.id.apply(
             (id) => `origin-access-identity/cloudfront/${id}`,

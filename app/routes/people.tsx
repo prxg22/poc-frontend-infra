@@ -9,12 +9,20 @@ export async function loader() {
     }, 4000)
   })
 
-  return defer({
-    person1: {
-      name: 'Joe Doe',
+  return defer(
+    {
+      person1: {
+        name: 'Joe Doe',
+      },
+      person2,
     },
-    person2,
-  })
+    {
+      headers: {
+        'cache-control': 'max-age=20; s-maxage=40',
+        'set-cookie': 'cookie1=1;',
+      },
+    },
+  )
 }
 
 export default function Index() {
