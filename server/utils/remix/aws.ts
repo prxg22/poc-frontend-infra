@@ -1,3 +1,5 @@
+import type { Writable } from 'stream'
+
 import type {
   AppLoadContext,
   ServerBuild,
@@ -19,7 +21,6 @@ import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyStructuredResultV2,
 } from 'aws-lambda'
-import { streamifyResponse, type ResponseStream } from 'lambda-stream'
 
 import { isBinaryType } from './binaryTypes'
 
@@ -36,7 +37,7 @@ export type GetLoadContextFunction = (
 
 export type RequestHandler = (
   ev: APIGatewayProxyEventV2,
-  stream: ResponseStream,
+  stream: Writable & { setContentType: (type: string) => void },
   ctx: Context,
   callback: Callback,
 ) => void
@@ -77,9 +78,14 @@ export function createStreamRequestHandler({
 }) {
   let handleRequest = createRemixRequestHandler(build, mode)
 
-  return streamifyResponse(
-    async (event: APIGatewayProxyEventV2, streamResponse: ResponseStream) => {
-      console.log(streamResponse)
+  // @ts-expect-error
+  return awslambda.streamifyResponse(
+    async (
+      event: APIGatewayProxyEventV2,
+      streamResponse: Writable & {
+        setContentType: (type: string) => void
+      },
+    ) => {
       let request = createRemixRequest(event)
       let loadContext = await getLoadContext?.(event)
 
@@ -144,29 +150,53 @@ export function createRemixHeaders(
 
 export async function sendStreamRemixResponse(
   nodeResponse: NodeResponse,
-  streamResponse: ResponseStream,
+  streamResponse: Writable & { setContentType: (type: string) => void },
 ) {
-  let contentType = nodeResponse.headers.get('Content-Type')
-  streamResponse.setContentType(contentType || 'text/html')
+  let { statusCode, headers } = parseResponse(nodeResponse)
 
   const metadata = {
-    status: nodeResponse.status,
-    headers: nodeResponse.headers,
-    isBinaryType: isBinaryType(contentType),
+    statusCode,
+    headers,
   }
 
   // @ts-expect-error
-  const response = awslambda.HttpResponseStream.from(streamResponse, metadata)
-  console.log({ metadata, response })
+  streamResponse = awslambda.HttpResponseStream.from(streamResponse, metadata)
 
   if (nodeResponse.body) {
-    return writeReadableStreamToWritable(nodeResponse.body, response)
+    return writeReadableStreamToWritable(nodeResponse.body, streamResponse)
   }
 }
 
 export async function sendRemixResponse(
   nodeResponse: NodeResponse,
 ): Promise<APIGatewayProxyStructuredResultV2> {
+  const { statusCode, headers, cookies, isBase64Encoded } =
+    parseResponse(nodeResponse)
+
+  let body: string | undefined
+
+  if (cookies.length) {
+    delete headers['Set-Cookie']
+  }
+
+  if (nodeResponse.body) {
+    if (isBase64Encoded) {
+      body = await readableStreamToString(nodeResponse.body, 'base64')
+    } else {
+      body = await nodeResponse.text()
+    }
+  }
+
+  return {
+    statusCode,
+    headers,
+    cookies,
+    body,
+    isBase64Encoded,
+  }
+}
+
+function parseResponse(nodeResponse: NodeResponse) {
   let cookies: string[] = []
 
   // Arc/AWS API Gateway will send back set-cookies outside of response headers.
@@ -178,27 +208,14 @@ export async function sendRemixResponse(
     }
   }
 
-  if (cookies.length) {
-    nodeResponse.headers.delete('Set-Cookie')
-  }
-
   let contentType = nodeResponse.headers.get('Content-Type')
   let isBase64Encoded = isBinaryType(contentType)
-  let body: string | undefined
-
-  if (nodeResponse.body) {
-    if (isBase64Encoded) {
-      body = await readableStreamToString(nodeResponse.body, 'base64')
-    } else {
-      body = await nodeResponse.text()
-    }
-  }
 
   return {
     statusCode: nodeResponse.status,
     headers: Object.fromEntries(nodeResponse.headers.entries()),
+    contentType,
     cookies,
-    body,
     isBase64Encoded,
   }
 }

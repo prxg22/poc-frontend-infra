@@ -20,7 +20,7 @@ module.exports = {
     '**/__components/*.{js,jsx,ts,tsx}',
   ],
   publicPath: '/static/',
-  server: 'server/remix.ts',
+  server: process.env.NODE_ENV === 'production' && 'server/remix.ts',
   serverBuildPath: 'server/build/index.js',
   serverMainFields: ['module', 'main'],
   serverModuleFormat: 'cjs',
