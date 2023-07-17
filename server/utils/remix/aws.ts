@@ -152,11 +152,12 @@ export async function sendStreamRemixResponse(
   nodeResponse: NodeResponse,
   streamResponse: Writable & { setContentType: (type: string) => void },
 ) {
-  let { statusCode, headers } = parseResponse(nodeResponse)
+  let { statusCode, headers, isBase64Encoded } = parseResponse(nodeResponse)
 
   const metadata = {
     statusCode,
     headers,
+    isBase64Encoded,
   }
 
   // @ts-expect-error
