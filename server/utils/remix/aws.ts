@@ -163,9 +163,8 @@ export async function sendStreamRemixResponse(
   // @ts-expect-error
   streamResponse = awslambda.HttpResponseStream.from(streamResponse, metadata)
 
-  if (nodeResponse.body) {
-    return writeReadableStreamToWritable(nodeResponse.body, streamResponse)
-  }
+  if (!nodeResponse.body) return streamResponse.write('')
+  return writeReadableStreamToWritable(nodeResponse.body, streamResponse)
 }
 
 export async function sendRemixResponse(
