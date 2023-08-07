@@ -8,7 +8,6 @@
     "deploy": "PULUMI_CONFIG_PASSPHRASE= pulumi up --yes"
   },
   "devDependencies": {
-    "@lemonenergy/eslint-config-frontend-ssr": "^0.1.0",
     "@remix-run/dev": "^1.18.1",
     "@remix-run/eslint-config": "^1.18.1",
     "@types/aws-sdk": "^2.7.0",
@@ -16,6 +15,7 @@
     "@types/react-dom": "^18.0.11",
     "esbuild": "^0.18.11",
     "eslint": "^8.38.0",
+    "eslint-config-prxg22": "^1.0.0",
     "typescript": "^5.0.4"
   },
   "dependencies": {

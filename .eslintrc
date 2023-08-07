@@ -1,5 +1,5 @@
 {
   "extends": [
-    "@lemonenergy/eslint-config-frontend-ssr"
+    "@lemonenergy/eslint-config-prxg22"
   ]
 }
