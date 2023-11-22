@@ -61,6 +61,7 @@ export function createRequestHandler({
     let request = createRemixRequest(event)
     let loadContext = await getLoadContext?.(event)
 
+    // @ts-expect-error
     let response = (await handleRequest(request, loadContext)) as NodeResponse
 
     return sendRemixResponse(response)
@@ -86,18 +87,16 @@ export function createStreamRequestHandler({
         setContentType: (type: string) => void
       },
     ) => {
+      console.log('remix handler event', event)
       let request = createRemixRequest(event)
       let loadContext = await getLoadContext?.(event)
 
-      let response = (await handleRequest(request, loadContext)) as NodeResponse
+      let response = (await handleRequest(
+        request as unknown as Request,
+        loadContext,
+      )) as unknown as NodeResponse
 
       sendStreamRemixResponse(response, streamResponse)
-
-      return {
-        statusCode: response.status,
-        headers: Object.fromEntries(response.headers),
-        body: response.body,
-      }
     },
   ) as RequestHandler
 }
@@ -116,6 +115,7 @@ export function createRemixRequest(event: APIGatewayProxyEventV2): NodeRequest {
 
   return new NodeRequest(url.href, {
     method: event.requestContext.http.method,
+    // @ts-expect-error
     headers: createRemixHeaders(event.headers, event.cookies),
     // Cast until reason/throwIfAborted added
     // https://github.com/mysticatea/abort-controller/issues/36
@@ -163,7 +163,11 @@ export async function sendStreamRemixResponse(
   // @ts-expect-error
   streamResponse = awslambda.HttpResponseStream.from(streamResponse, metadata)
 
-  if (!nodeResponse.body) return streamResponse.write('')
+  if (!nodeResponse.body) {
+    streamResponse.write('')
+
+    return streamResponse.end()
+  }
   return writeReadableStreamToWritable(nodeResponse.body, streamResponse)
 }
 
